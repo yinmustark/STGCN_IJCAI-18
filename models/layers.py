@@ -6,25 +6,28 @@
 # @Github   : https://github.com/VeritasYin/Project_Orion
 
 import tensorflow as tf
+from utils.math_graph import scaled_laplacian_tf, cheb_poly_approx_tf
 
 
-def gconv(x, theta, Ks, c_in, c_out):
+def gconv(x, Lt, T, theta, Ks, c_in, c_out):
     '''
     Spectral-based graph convolution function.
-    :param x: tensor, [batch_size, n_route, c_in].
+    :param x: tensor, [batch_size, t, n_route, c_in].
     :param theta: tensor, [Ks*c_in, c_out], trainable kernel parameters.
     :param Ks: int, kernel size of graph convolution.
     :param c_in: int, size of input channel.
     :param c_out: int, size of output channel.
     :return: tensor, [batch_size, n_route, c_out].
     '''
-    # graph kernel: tensor, [n_route, Ks*n_route]
-    kernel = tf.get_collection('graph_kernel')[0]
-    n = tf.shape(kernel)[0]
+    # graph kernel: tensor, [batch_size, n_route, Ks*n_route]
+    # kernel = tf.get_collection('graph_kernel')[0]
+    kernel = Lt
+    n = tf.shape(kernel)[1]
     # x -> [batch_size, c_in, n_route] -> [batch_size*c_in, n_route]
-    x_tmp = tf.reshape(tf.transpose(x, [0, 2, 1]), [-1, n])
+    x_tmp = tf.reshape(tf.transpose(x, [0, 1, 3, 2]), [-1, T*c_in, n]) #[b, t, n, c] -> [b, t*c, n]
+    #x_tmp = tf.reshape(tf.transpose(x, [0, 2, 1]), [-1, n])
     # x_mul = x_tmp * ker -> [batch_size*c_in, Ks*n_route] -> [batch_size, c_in, Ks, n_route]
-    x_mul = tf.reshape(tf.matmul(x_tmp, kernel), [-1, c_in, Ks, n])
+    x_mul = tf.reshape(tf.reshape(tf.matmul(x_tmp, kernel), [-1, T, c_in, Ks, n]), [-1, c_in, Ks, n])
     # x_ker -> [batch_size, n_route, c_in, K_s] -> [batch_size*n_route, c_in*Ks]
     x_ker = tf.reshape(tf.transpose(x_mul, [0, 3, 1, 2]), [-1, c_in * Ks])
     # x_gconv -> [batch_size*n_route, c_out] -> [batch_size, n_route, c_out]
@@ -98,7 +101,7 @@ def temporal_conv_layer(x, Kt, c_in, c_out, act_func='relu'):
             raise ValueError(f'ERROR: activation function "{act_func}" is not defined.')
 
 
-def spatio_conv_layer(x, Ks, c_in, c_out):
+def spatio_conv_layer(x, Lt, Ks, c_in, c_out):
     '''
     Spatial graph convolution layer.
     :param x: tensor, [batch_size, time_step, n_route, c_in].
@@ -127,13 +130,14 @@ def spatio_conv_layer(x, Ks, c_in, c_out):
     variable_summaries(ws, 'theta')
     bs = tf.get_variable(name='bs', initializer=tf.zeros([c_out]), dtype=tf.float32)
     # x -> [batch_size*time_step, n_route, c_in] -> [batch_size*time_step, n_route, c_out]
-    x_gconv = gconv(tf.reshape(x, [-1, n, c_in]), ws, Ks, c_in, c_out) + bs
+    #x_gconv = gconv(tf.reshape(x, [-1, n, c_in]), Lt, ws, Ks, c_in, c_out) + bs
+    x_gconv = gconv(x, Lt, T, ws, Ks, c_in, c_out) + bs
     # x_g -> [batch_size, time_step, n_route, c_out]
     x_gc = tf.reshape(x_gconv, [-1, T, n, c_out])
     return tf.nn.relu(x_gc[:, :, :, 0:c_out] + x_input)
 
 
-def st_conv_block(x, Ks, Kt, channels, scope, keep_prob, act_func='GLU'):
+def st_conv_block(x, Lt, Ks, Kt, channels, scope, keep_prob, act_func='GLU'):
     '''
     Spatio-temporal convolutional block, which contains two temporal gated convolution layers
     and one spatial graph convolution layer in the middle.
@@ -150,7 +154,7 @@ def st_conv_block(x, Ks, Kt, channels, scope, keep_prob, act_func='GLU'):
 
     with tf.variable_scope(f'stn_block_{scope}_in'):
         x_s = temporal_conv_layer(x, Kt, c_si, c_t, act_func=act_func)
-        x_t = spatio_conv_layer(x_s, Ks, c_t, c_t)
+        x_t = spatio_conv_layer(x_s, Lt, Ks, c_t, c_t)
     with tf.variable_scope(f'stn_block_{scope}_out'):
         x_o = temporal_conv_layer(x_t, Kt, c_t, c_oo)
     x_ln = layer_norm(x_o, f'layer_norm_{scope}')
@@ -214,3 +218,56 @@ def variable_summaries(var, v_name):
         tf.summary.scalar(f'min_{v_name}', tf.reduce_min(var))
 
         tf.summary.histogram(f'histogram_{v_name}', var)
+
+def laplacian_estimator(x, Ks):
+    _, n_his, n, channel = x.get_shape().as_list()
+    rank_s, rank_t = tf.get_collection("matrix_rank")
+    U1 = tf.get_variable(name = "proj_s", shape = [n, rank_s], initializer=tf.random_normal_initializer())
+    U2 = tf.get_variable(name = "proj_t", shape = [n_his, rank_t], initializer=tf.random_normal_initializer())
+    # Decomposition
+    x_tmp_s = tf.reshape(tf.transpose(x, [0, 1, 3, 2]), [-1, n_his * channel, n])
+    x_proj_s = tf.reshape(tf.matmul(x_tmp_s, U1), [-1, n_his, channel, rank_s])
+    x_tmp_t = tf.transpose(tf.reshape(x_proj_s, [-1, n_his, channel*rank_s]), [0, 2, 1])
+    x_proj_t = tf.matmul(x_tmp_t, U2)
+    x_restore_t = tf.matmul(x_proj_t, tf.transpose(U2))
+    x_tmp_r = tf.reshape(tf.transpose(x_restore_t, [0, 2, 1]), [-1, n_his, channel, rank_s])
+    x_tmp_r = tf.reshape(x_tmp_r, [-1, n_his*channel, rank_s])
+    x_restore_s = tf.matmul(x_tmp_r, tf.transpose(U1))
+    Xs = tf.transpose(tf.reshape(x_restore_s, [-1, n_his, channel, n]), [0, 1, 3, 2])
+    Xe = x - Xs
+    # Unfolding Normalization
+    Xs = tf.transpose(Xs, [0, 1, 3, 2])
+    Xe = tf.transpose(Xe, [0, 1, 3, 2])
+    Xs = tf.reshape(Xs, [-1, n_his*channel, n])
+    Xs = Xs - tf.reduce_mean(tf.reduce_mean(Xs, axis=1, keepdims=True), axis=2, keep_dims=True)
+    Xe = tf.reshape(Xe, [-1, n_his*channel, n])
+    Xe = Xe - tf.reduce_mean(tf.reduce_mean(Xe, axis=1, keepdims=True), axis=2, keep_dims=True)
+    Q_se = tf.matmul(tf.transpose(Xs, [0, 2, 1]), Xe)
+    Q_ss = tf.matmul(tf.transpose(Xs, [0, 2, 1]), Xs)
+    Q_ee = tf.matmul(tf.transpose(Xe, [0, 2, 1]), Xe)
+    # 2D-conv
+    Q_input = tf.concat([tf.expand_dims(Q, -1) for Q in [Q_se, Q_ss, Q_ee]], axis=-1)  # [Batch, n, n, 3]
+    w_q1 = tf.get_variable('wq_input1', shape=[3, 3, 3, 3], dtype=tf.float32)
+    w_q2 = tf.get_variable('wq_input2', shape=[3, 3, 3, 1], dtype=tf.float32)
+    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(w_q1))
+    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(w_q2))
+    Q_tmp = tf.nn.conv2d(Q_input, w_q1, strides=[1, 1, 1, 1], padding='SAME')
+    Ze = tf.nn.conv2d(Q_tmp, w_q2, strides=[1, 1, 1, 1], padding='SAME')
+    # Estimato B and Le
+    B = Q_se + Q_ee + Q_ss + tf.reshape(Ze, [-1, n, n])
+    I = tf.get_collection('series_iteration')[0]
+    Ls = tf.get_collection("base_graph_kernel")[0]
+    eta = -1
+    factor = tf.matmul(B, Ls)
+    prod = tf.matmul(Ls, factor)
+    Lt = Ls + eta * prod
+    for i in range(2, I+1):
+        eta *= -1
+        prod = tf.matmul(prod, factor)
+        Lt = Lt + eta * prod
+    # Laplacian Normalization
+    Lt = scaled_laplacian_tf(Lt, n)
+    pretrain_loss1 = tf.reduce_mean(tf.linalg.trace(tf.matmul(Q_ss, Ls))) / (n * n)
+    pretrain_loss2 = tf.sqrt(tf.reduce_mean(Xe ** 2))
+    Lt = cheb_poly_approx_tf(Lt, Ks, n)
+    return Lt, [pretrain_loss1, pretrain_loss2], [tf.linalg.trace(tf.matmul(Q_ss, Ls)), tf.linalg.det(Q_ss)]

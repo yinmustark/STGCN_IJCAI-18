@@ -12,6 +12,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from os.path import join as pjoin
 
 import tensorflow as tf
+import numpy as np
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -37,6 +38,10 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--opt', type=str, default='RMSProp')
 parser.add_argument('--graph', type=str, default='default')
 parser.add_argument('--inf_mode', type=str, default='merge')
+parser.add_argument('--beta', type=float, default=0.1)
+parser.add_argument('--rank', type=list, nargs=2, default=[10,3])
+parser.add_argument('--I', type=int, default=6)
+parser.add_argument('-pe', '--pretrain_epoch', type=int, default=10)
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -45,6 +50,10 @@ n, n_his, n_pred = args.n_route, args.n_his, args.n_pred
 Ks, Kt = args.ks, args.kt
 # blocks: settings of channel size in st_conv_blocks / bottleneck design
 blocks = [[1, 32, 64], [64, 32, 128]]
+tf.add_to_collection(name='pretrain_beta', value=args.beta)
+tf.add_to_collection(name='matrix_rank', value=args.rank[0])
+tf.add_to_collection(name='matrix_rank', value=args.rank[1])
+tf.add_to_collection(name='series_iteration', value=args.I)
 
 # Load wighted adjacency matrix W
 if args.graph == 'default':
@@ -54,10 +63,9 @@ else:
     W = weight_matrix(pjoin('./dataset', args.graph))
 
 # Calculate graph kernel
-L = scaled_laplacian(W)
+Ls = scaled_laplacian(W)[None, :, :]
 # Alternative approximation method: 1st approx - first_approx(W, n).
-Lk = cheb_poly_approx(L, Ks, n)
-tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lk), tf.float32))
+tf.add_to_collection(name='base_graph_kernel', value=tf.cast(tf.constant(Ls), tf.float32))
 
 # Data Preprocessing
 data_file = f'PeMSD7_V_{n}.csv'

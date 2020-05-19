@@ -22,11 +22,13 @@ def build_model(inputs, n_his, Ks, Kt, blocks, keep_prob):
     '''
     x = inputs[:, 0:n_his, :, :]
 
+    Lt, pretrain_losses, info = laplacian_estimator(x, Ks)
+
     # Ko>0: kernel size of temporal convolution in the output layer.
     Ko = n_his
     # ST-Block
     for i, channels in enumerate(blocks):
-        x = st_conv_block(x, Ks, Kt, channels, i, keep_prob, act_func='GLU')
+        x = st_conv_block(x, Lt, Ks, Kt, channels, i, keep_prob, act_func='GLU')
         Ko -= 2 * (Ks - 1)
 
     # Output Layer
@@ -40,7 +42,9 @@ def build_model(inputs, n_his, Ks, Kt, blocks, keep_prob):
     train_loss = tf.nn.l2_loss(y - inputs[:, n_his:n_his + 1, :, :])
     single_pred = y[:, 0, :, :]
     tf.add_to_collection(name='y_pred', value=single_pred)
-    return train_loss, single_pred
+
+    #pretrain_loss = tf.reduce_sum(tf.trace(tf.matmul(Q_ss, Ls))) + beta * tf.nn.l2_loss(Xe)
+    return train_loss, single_pred, pretrain_losses, info
 
 
 def model_save(sess, global_steps, model_name, save_path='./output/models/'):

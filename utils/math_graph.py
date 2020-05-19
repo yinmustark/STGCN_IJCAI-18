@@ -8,6 +8,55 @@
 import numpy as np
 import pandas as pd
 from scipy.sparse.linalg import eigs
+import tensorflow as tf
+
+
+def scaled_laplacian_tf(L, n):
+    '''
+    Normalized graph Laplacian function. Input W is 
+    :param W: tf.tensor, [batch_size, n_route, n_route], weighted adjacency matrix of G.
+    :return: tf.tensor, [batch_size, n_route, n_route].
+    '''
+    # d ->  diagonal degree matrix
+    d = tf.linalg.diag_part(L)
+    # L -> graph Laplacian
+    #L[np.diag_indices_from(L)] = d
+    # for i in range(n):
+    #     for j in range(n):
+    #         if (d[:, i] > 0) and (d[:, j] > 0):
+    #             L[:, i, j] = L[:, i, j] / tf.sqrt(d[i] * d[j])
+    condition = tf.less(d, 1e-8)
+    dp = tf.where(condition, tf.ones_like(d), d)
+    D12 = tf.linalg.diag(1. / tf.sqrt(d))
+    Lr = tf.matmul(tf.matmul(D12, L), D12)
+    # lambda_max \approx 2.0, the largest eigenvalues of L.
+    eigs, _ = tf.linalg.eigh(Lr)
+    lambda_max = eigs[:, -1]
+    return 2 * Lr / lambda_max - tf.eye(n, batch_shape=[1])
+
+
+def cheb_poly_approx_tf(L, Ks, n):
+    '''
+    Chebyshev polynomials approximation function.
+    :param L: np.matrix, [n_route, n_route], graph Laplacian.
+    :param Ks: int, kernel size of spatial convolution.
+    :param n: int, number of routes / size of graph.
+    :return: np.ndarray, [n_route, Ks*n_route].
+    '''
+    L0, L1 = tf.zeros_like(L) + tf.eye(n, batch_shape=[1]), L
+
+    if Ks > 1:
+        L_list = [L0, L1]
+        for i in range(Ks - 2):
+            Ln = 2 * L * L1 - L0
+            L_list.append(Ln)
+            L0, L1 = L1, Ln
+        # L_lsit [Ks, n*n], Lk [n, Ks*n]
+        return tf.concat(L_list, axis=-1)
+    elif Ks == 1:
+        return L0
+    else:
+        raise ValueError(f'ERROR: the size of spatial kernel must be greater than 1, but received "{Ks}".')
 
 
 def scaled_laplacian(W):
