@@ -23,6 +23,9 @@ from data_loader.data_utils import *
 from models.trainer import model_train
 from models.tester import model_test
 
+import warnings
+warnings.filterwarnings("ignore")
+
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -38,7 +41,7 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--opt', type=str, default='RMSProp')
 parser.add_argument('--graph', type=str, default='default')
 parser.add_argument('--inf_mode', type=str, default='merge')
-parser.add_argument('--beta', type=float, default=0.1)
+parser.add_argument('--beta', type=float, default=0.01)
 parser.add_argument('--rank', type=list, nargs=2, default=[10,3])
 parser.add_argument('--I', type=int, default=6)
 parser.add_argument('-pe', '--pretrain_epoch', type=int, default=10)

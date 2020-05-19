@@ -10,6 +10,17 @@ import pandas as pd
 from scipy.sparse.linalg import eigs
 import tensorflow as tf
 
+def myPrint(a):
+    print("TENSOR PRINT")
+    print(a)
+    return a
+
+def max_eigs(A):
+    b = A.shape[0]
+    res = []
+    for i in range(b):
+        res.append(eigs(A[i,:,:], k=1, which='LR')[0][0].real)
+    return np.array(res)
 
 def scaled_laplacian_tf(L, n):
     '''
@@ -25,15 +36,17 @@ def scaled_laplacian_tf(L, n):
     #     for j in range(n):
     #         if (d[:, i] > 0) and (d[:, j] > 0):
     #             L[:, i, j] = L[:, i, j] / tf.sqrt(d[i] * d[j])
-    condition = tf.less(d, 1e-8)
+    condition = tf.less(d, 1e-6)
     dp = tf.where(condition, tf.ones_like(d), d)
-    D12 = tf.linalg.diag(1. / tf.sqrt(d))
+    D12 = tf.linalg.diag(1. / tf.sqrt(dp))
     Lr = tf.matmul(tf.matmul(D12, L), D12)
+    # Lr = L
+    eigs = tf.py_func(max_eigs, [Lr], tf.float32)
     # lambda_max \approx 2.0, the largest eigenvalues of L.
-    eigs, _ = tf.linalg.eigh(Lr)
-    lambda_max = eigs[:, -1]
+    # eigs, _ = tf.linalg.eigh(Lr)
+    lambda_max = tf.reshape(eigs, [-1, 1, 1])
     return 2 * Lr / lambda_max - tf.eye(n, batch_shape=[1])
-
+    #return L
 
 def cheb_poly_approx_tf(L, Ks, n):
     '''
@@ -75,9 +88,9 @@ def scaled_laplacian(W):
             if (d[i] > 0) and (d[j] > 0):
                 L[i, j] = L[i, j] / np.sqrt(d[i] * d[j])
     # lambda_max \approx 2.0, the largest eigenvalues of L.
-    lambda_max = eigs(L, k=1, which='LR')[0][0].real
-    return np.mat(2 * L / lambda_max - np.identity(n))
-
+    # lambda_max = eigs(L, k=1, which='LR')[0][0].real
+    #return np.mat(2 * L / lambda_max - np.identity(n))
+    return L
 
 def cheb_poly_approx(L, Ks, n):
     '''

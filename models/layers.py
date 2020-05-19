@@ -6,7 +6,7 @@
 # @Github   : https://github.com/VeritasYin/Project_Orion
 
 import tensorflow as tf
-from utils.math_graph import scaled_laplacian_tf, cheb_poly_approx_tf
+from utils.math_graph import *
 
 
 def gconv(x, Lt, T, theta, Ks, c_in, c_out):
@@ -219,8 +219,7 @@ def variable_summaries(var, v_name):
 
         tf.summary.histogram(f'histogram_{v_name}', var)
 
-def laplacian_estimator(x, Ks):
-    _, n_his, n, channel = x.get_shape().as_list()
+def tucker_decomp(x, n_his, n, channel):
     rank_s, rank_t = tf.get_collection("matrix_rank")
     U1 = tf.get_variable(name = "proj_s", shape = [n, rank_s], initializer=tf.random_normal_initializer())
     U2 = tf.get_variable(name = "proj_t", shape = [n_his, rank_t], initializer=tf.random_normal_initializer())
@@ -235,39 +234,71 @@ def laplacian_estimator(x, Ks):
     x_restore_s = tf.matmul(x_tmp_r, tf.transpose(U1))
     Xs = tf.transpose(tf.reshape(x_restore_s, [-1, n_his, channel, n]), [0, 1, 3, 2])
     Xe = x - Xs
-    # Unfolding Normalization
-    Xs = tf.transpose(Xs, [0, 1, 3, 2])
-    Xe = tf.transpose(Xe, [0, 1, 3, 2])
-    Xs = tf.reshape(Xs, [-1, n_his*channel, n])
-    Xs = Xs - tf.reduce_mean(tf.reduce_mean(Xs, axis=1, keepdims=True), axis=2, keep_dims=True)
-    Xe = tf.reshape(Xe, [-1, n_his*channel, n])
-    Xe = Xe - tf.reduce_mean(tf.reduce_mean(Xe, axis=1, keepdims=True), axis=2, keep_dims=True)
-    Q_se = tf.matmul(tf.transpose(Xs, [0, 2, 1]), Xe)
-    Q_ss = tf.matmul(tf.transpose(Xs, [0, 2, 1]), Xs)
-    Q_ee = tf.matmul(tf.transpose(Xe, [0, 2, 1]), Xe)
-    # 2D-conv
-    Q_input = tf.concat([tf.expand_dims(Q, -1) for Q in [Q_se, Q_ss, Q_ee]], axis=-1)  # [Batch, n, n, 3]
+    return Xs, Xe
+
+def conv_2d(inp):
     w_q1 = tf.get_variable('wq_input1', shape=[3, 3, 3, 3], dtype=tf.float32)
     w_q2 = tf.get_variable('wq_input2', shape=[3, 3, 3, 1], dtype=tf.float32)
     tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(w_q1))
     tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(w_q2))
-    Q_tmp = tf.nn.conv2d(Q_input, w_q1, strides=[1, 1, 1, 1], padding='SAME')
-    Ze = tf.nn.conv2d(Q_tmp, w_q2, strides=[1, 1, 1, 1], padding='SAME')
-    # Estimato B and Le
-    B = Q_se + Q_ee + Q_ss + tf.reshape(Ze, [-1, n, n])
+    out = tf.nn.conv2d(inp, w_q1, strides=[1, 1, 1, 1], padding='SAME')
+    out = tf.layers.batch_normalization(out)
+    out = tf.nn.relu(out)
+    out =  tf.nn.conv2d(out, w_q2, strides=[1, 1, 1, 1], padding='SAME')
+    return tf.nn.relu(out)
+
+def approx_L(B, Ls):
     I = tf.get_collection('series_iteration')[0]
-    Ls = tf.get_collection("base_graph_kernel")[0]
     eta = -1
     factor = tf.matmul(B, Ls)
+    # factor = tf.py_func(myPrint, [factor], tf.float32)
+    #factor = tf.py_func(calc_max_eigv, [tf.matmul(Ls, B)], tf.float32)
     prod = tf.matmul(Ls, factor)
     Lt = Ls + eta * prod
+    #tf.py_func(myPrint, [Lt], tf.float32)
     for i in range(2, I+1):
         eta *= -1
         prod = tf.matmul(prod, factor)
         Lt = Lt + eta * prod
+    return Lt
+
+def calc_L(n, B, Ls):
+    factor = tf.matmul(Ls, B)
+    I = tf.eye(n, batch_shape=[1])
+    inv = tf.linalg.inv(I + factor)
+    Le = tf.matmul(tf.matmul(factor, inv), Ls)
+    return Ls + Le
+
+def laplacian_estimator(x, Ks):
+    _, n_his, n, channel = x.get_shape().as_list()
+    Xs, Xe = tucker_decomp(x, n_his, n, channel)
+    # Unfolding Normalization
+    Xs = tf.transpose(Xs, [0, 1, 3, 2])
+    Xe = tf.transpose(Xe, [0, 1, 3, 2])
+    Xs = tf.reshape(Xs, [-1, n_his*channel, n])
+    Xs = Xs - tf.reduce_mean(Xs, axis=1, keepdims=True)
+    Xe = tf.reshape(Xe, [-1, n_his*channel, n])
+    Xe = Xe - tf.reduce_mean(Xe, axis=1, keepdims=True)
+    Xs_norm = Xs / tf.sqrt(tf.reduce_sum(Xs ** 2, axis=1, keep_dims=True) + 1e-12)
+    Xe_norm = Xe / tf.sqrt(tf.reduce_sum(Xe ** 2, axis=1, keep_dims=True) + 1e-12)
+    Q_se = tf.matmul(tf.transpose(Xs_norm, [0, 2, 1]), Xe_norm)
+    Q_ss = tf.matmul(tf.transpose(Xs_norm, [0, 2, 1]), Xs_norm)
+    Q_ee = tf.matmul(tf.transpose(Xe_norm, [0, 2, 1]), Xe_norm)
+    # 2D-conv
+    Q_input = tf.concat([tf.expand_dims(Q, -1) for Q in [Q_se, Q_ss, Q_ee]], axis=-1)  # [Batch, n, n, 3]
+    Ze = conv_2d(Q_input)
+    # Estimato B and Le
+    B = Q_se + Q_ee + Q_ss + tf.reshape(Ze, [-1, n, n])
+    Ls = tf.get_collection("base_graph_kernel")[0]
+    # Lt = apprx_L(B, Ls)
+    Lt = calc_L(n, B, Ls)
+    #Lt = tf.py_func(myPrint, [Lt], tf.float32)
     # Laplacian Normalization
     Lt = scaled_laplacian_tf(Lt, n)
     pretrain_loss1 = tf.reduce_mean(tf.linalg.trace(tf.matmul(Q_ss, Ls))) / (n * n)
-    pretrain_loss2 = tf.sqrt(tf.reduce_mean(Xe ** 2))
+    pretrain_loss2 = tf.sqrt(tf.reduce_mean(Xe_norm ** 2))
     Lt = cheb_poly_approx_tf(Lt, Ks, n)
-    return Lt, [pretrain_loss1, pretrain_loss2], [tf.linalg.trace(tf.matmul(Q_ss, Ls)), tf.linalg.det(Q_ss)]
+    return Lt, [pretrain_loss1, pretrain_loss2], None
+
+# def trace(a, b):
+#     return tf.reduce_sum(tf.linalg.diag_part(tf.matmul(a, b)), axis=-1)

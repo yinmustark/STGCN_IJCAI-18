@@ -39,6 +39,8 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
     pretrain_loss = pretrain_losses[0] + args.beta * pretrain_losses[1]
     tf.summary.scalar('pretrain_loss', pretrain_loss)
 
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)  # for batch_norm
+
     # Learning rate settings
     global_steps = tf.Variable(0, trainable=False)
     len_train = inputs.get_len('train')
@@ -50,7 +52,7 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
     lr = tf.train.exponential_decay(args.lr, global_steps, decay_steps=5 * epoch_step, decay_rate=0.7, staircase=True)
     tf.summary.scalar('learning_rate', lr)
     step_op = tf.assign_add(global_steps, 1)
-    with tf.control_dependencies([step_op]):
+    with tf.control_dependencies([step_op] + update_ops):
         if opt == 'RMSProp':
             train_op = tf.train.RMSPropOptimizer(lr).minimize(train_loss)
         elif opt == 'ADAM':
@@ -62,7 +64,7 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
     pre_lr = tf.train.exponential_decay(args.lr, pre_global_steps, decay_steps=5 * epoch_step, decay_rate=0.7, staircase=True)
     tf.summary.scalar('pretrain_learning_rate', pre_lr)
     pre_step_op = tf.assign_add(pre_global_steps, 1)
-    with tf.control_dependencies([pre_step_op]):
+    with tf.control_dependencies([pre_step_op] + update_ops):
         if opt == 'RMSProp':
             pretrain_op = tf.train.RMSPropOptimizer(pre_lr).minimize(pretrain_loss)
         elif opt == 'ADAM':
@@ -92,15 +94,15 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
         for i in range(args.pretrain_epoch):
             for j, x_batch in enumerate(
                     gen_batch(inputs.get_data('train'), batch_size, dynamic_batch=True, shuffle=True)):
-                #_, _ = sess.run([pretrain_loss, pretrain_op], feed_dict={x: x_batch[:, 0:n_his + 1, :, :], keep_prob: 1.0})
+                _, _ = sess.run([pretrain_loss, pretrain_op], feed_dict={x: x_batch[:, 0:n_his + 1, :, :], keep_prob: 1.0})
                 if j % 50 == 0:
                     preloss1, preloss2, pretrain_v = sess.run(pretrain_losses + [pretrain_loss], feed_dict={x: x_batch[:, 0:n_his + 1, :, :], keep_prob: 1.0})
-                    print(f'Epoch {i:2d}, Step {j:3d}: loss1 {preloss1:.3f}')
-                    print(f'Epoch {i:2d}, Step {j:3d}: loss2 {preloss2:.3f}')
-                    print(f'Epoch {i:2d}, Step {j:3d}: total loss {pretrain_v:.3f}')
-                    info1, info2 = sess.run(info, feed_dict={x: x_batch[:, 0:n_his + 1, :, :], keep_prob: 1.0})
-                    print(info1)
-                    print(info2)
+                    print(f'Epoch {i:2d}, Step {j:3d}: loss1 {preloss1:.5f}')
+                    print(f'Epoch {i:2d}, Step {j:3d}: loss2 {preloss2:.5f}')
+                    print(f'Epoch {i:2d}, Step {j:3d}: total loss {pretrain_v:.6f}')
+                    # info1, info2 = sess.run(info, feed_dict={x: x_batch[:, 0:n_his + 1, :, :], keep_prob: 1.0})
+                    # print(info1)
+                    # print(np.sum(info2))
 
         print('Start Training!')
         for i in range(epoch):
