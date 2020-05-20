@@ -42,9 +42,10 @@ parser.add_argument('--opt', type=str, default='RMSProp')
 parser.add_argument('--graph', type=str, default='default')
 parser.add_argument('--inf_mode', type=str, default='merge')
 parser.add_argument('--beta', type=float, default=0.01)
-parser.add_argument('--rank', type=list, nargs=2, default=[20,3])
+parser.add_argument('--rank', type=int, nargs=2, default=[10,3])
 parser.add_argument('--I', type=int, default=6)
-parser.add_argument('-pe', '--pretrain_epoch', type=int, default=20)
+parser.add_argument('-pe', '--pretrain_epoch', type=int, default=26)
+parser.add_argument('-p', '--save_path', type=str, default='./output/')
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -54,9 +55,10 @@ Ks, Kt = args.ks, args.kt
 # blocks: settings of channel size in st_conv_blocks / bottleneck design
 blocks = [[1, 32, 64], [64, 32, 128]]
 tf.add_to_collection(name='pretrain_beta', value=args.beta)
-tf.add_to_collection(name='matrix_rank', value=args.rank[0])
-tf.add_to_collection(name='matrix_rank', value=args.rank[1])
+tf.add_to_collection(name='matrix_rank', value=int(args.rank[0]))
+tf.add_to_collection(name='matrix_rank', value=int(args.rank[1]))
 tf.add_to_collection(name='series_iteration', value=args.I)
+sum_path = pjoin(args.save_path, 'tensorboard/')
 
 # Load wighted adjacency matrix W
 if args.graph == 'default':
@@ -77,5 +79,5 @@ PeMS = data_gen(pjoin('./dataset', data_file), (n_train, n_val, n_test), n, n_hi
 print(f'>> Loading dataset with Mean: {PeMS.mean:.2f}, STD: {PeMS.std:.2f}')
 
 if __name__ == '__main__':
-    model_train(PeMS, blocks, args)
+    model_train(PeMS, blocks, args, sum_path)
     model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode)
