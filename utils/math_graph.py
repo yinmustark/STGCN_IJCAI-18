@@ -8,69 +8,6 @@
 import numpy as np
 import pandas as pd
 from scipy.sparse.linalg import eigs
-import tensorflow as tf
-
-def myPrint(a):
-    print("TENSOR PRINT")
-    print(a)
-    return a
-
-def max_eigs(A):
-    b = A.shape[0]
-    res = []
-    for i in range(b):
-        res.append(eigs(A[i,:,:], k=1, which='LR')[0][0].real)
-    return np.array(res)
-
-def scaled_laplacian_tf(L, n):
-    '''
-    Normalized graph Laplacian function. Input W is 
-    :param W: tf.tensor, [batch_size, n_route, n_route], weighted adjacency matrix of G.
-    :return: tf.tensor, [batch_size, n_route, n_route].
-    '''
-    # d ->  diagonal degree matrix
-    d = tf.linalg.diag_part(L)
-    # L -> graph Laplacian
-    #L[np.diag_indices_from(L)] = d
-    # for i in range(n):
-    #     for j in range(n):
-    #         if (d[:, i] > 0) and (d[:, j] > 0):
-    #             L[:, i, j] = L[:, i, j] / tf.sqrt(d[i] * d[j])
-    condition = tf.less(d, 1e-6)
-    dp = tf.where(condition, tf.ones_like(d), d)
-    D12 = tf.linalg.diag(1. / tf.sqrt(dp))
-    Lr = tf.matmul(tf.matmul(D12, L), D12)
-    # Lr = L
-    eigs = tf.py_func(max_eigs, [Lr], tf.float32)
-    # lambda_max \approx 2.0, the largest eigenvalues of L.
-    # eigs, _ = tf.linalg.eigh(Lr)
-    lambda_max = tf.reshape(eigs, [-1, 1, 1])
-    return 2 * Lr / lambda_max - tf.eye(n, batch_shape=[1])
-    #return L
-
-def cheb_poly_approx_tf(L, Ks, n):
-    '''
-    Chebyshev polynomials approximation function.
-    :param L: np.matrix, [n_route, n_route], graph Laplacian.
-    :param Ks: int, kernel size of spatial convolution.
-    :param n: int, number of routes / size of graph.
-    :return: np.ndarray, [n_route, Ks*n_route].
-    '''
-    L0, L1 = tf.zeros_like(L) + tf.eye(n, batch_shape=[1]), L
-
-    if Ks > 1:
-        L_list = [L0, L1]
-        for i in range(Ks - 2):
-            Ln = 2 * L * L1 - L0
-            L_list.append(Ln)
-            L0, L1 = L1, Ln
-        # L_lsit [Ks, n*n], Lk [n, Ks*n]
-        return tf.concat(L_list, axis=-1)
-    elif Ks == 1:
-        return L0
-    else:
-        raise ValueError(f'ERROR: the size of spatial kernel must be greater than 1, but received "{Ks}".')
-
 
 def scaled_laplacian(W):
     '''

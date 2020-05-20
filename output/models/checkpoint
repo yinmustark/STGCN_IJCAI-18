@@ -1,0 +1,2 @@
+model_checkpoint_path: "STGCN-9150"
+all_model_checkpoint_paths: "STGCN-9150"
