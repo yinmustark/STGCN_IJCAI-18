@@ -30,7 +30,7 @@ def scaled_laplacian_tf(L, n):
     # Lr = L
     eigv = tf.py_func(max_eigs, [Lr], tf.float32)
     # lambda_max \approx 2.0, the largest eigenvalues of L.
-    # eigs, _ = tf.linalg.eigh(Lr)
+    # eigv, _ = tf.linalg.eigh(Lr)
     lambda_max = tf.reshape(eigv, [-1, 1, 1])
     return 2 * Lr / lambda_max - tf.eye(n, batch_shape=[1])
     #return L
@@ -81,18 +81,21 @@ def unfold_normalization(A):
     A = tf.transpose(A, [0, 1, 3, 2])
     A = tf.reshape(A, [-1, n_his*channel, n])
     A = A - tf.reduce_mean(A, axis=1, keepdims=True)
-    A_norm = A / tf.sqrt(tf.reduce_sum(A ** 2, axis=1, keep_dims=True) + 1e-12)
+    A_norm = A / tf.sqrt(tf.reduce_sum(A ** 2, axis=1, keep_dims=True) + 1e-8)
     return A_norm
 
 def conv_2d(inp):
-    w_q1 = tf.get_variable('wq_input1', shape=[3, 3, 3, 3], dtype=tf.float32)
-    w_q2 = tf.get_variable('wq_input2', shape=[3, 3, 3, 1], dtype=tf.float32)
+    w_q1 = tf.get_variable('wq1', shape=[3, 3, 3, 3], dtype=tf.float32)
+    w_q2 = tf.get_variable('wq2', shape=[3, 3, 3, 1], dtype=tf.float32)
+    b_q1 = tf.get_variable(name='bq1', initializer=tf.zeros([3]), dtype=tf.float32)
+    b_q2 = tf.get_variable(name='bq2', initializer=tf.zeros([1]), dtype=tf.float32)
     tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(w_q1))
     tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(w_q2))
-    out = tf.nn.conv2d(inp, w_q1, strides=[1, 1, 1, 1], padding='SAME')
+    out = tf.nn.conv2d(inp, w_q1, strides=[1, 1, 1, 1], padding='SAME') + b_q1
     out = tf.layers.batch_normalization(out)
     out = tf.nn.relu(out)
-    out =  tf.nn.conv2d(out, w_q2, strides=[1, 1, 1, 1], padding='SAME')
+    out = tf.nn.conv2d(out, w_q2, strides=[1, 1, 1, 1], padding='SAME') + b_q2
+    out = tf.layers.batch_normalization(out)
     return tf.nn.relu(out)
 
 def approx_L(B, Ls):
@@ -102,13 +105,13 @@ def approx_L(B, Ls):
     # factor = tf.py_func(myPrint, [factor], tf.float32)
     #factor = tf.py_func(calc_max_eigv, [tf.matmul(Ls, B)], tf.float32)
     prod = tf.matmul(Ls, factor)
-    Lt = Ls + eta * prod
+    Le = eta * prod
     #tf.py_func(myPrint, [Lt], tf.float32)
     for i in range(2, I+1):
         eta *= -1
         prod = tf.matmul(prod, factor)
-        Lt = Lt + eta * prod
-    return Lt
+        Le = Le + eta * prod
+    return Ls + Le
 
 def calc_L(n, B, Ls):
     factor = tf.matmul(Ls, B)
@@ -131,8 +134,8 @@ def laplacian_estimator(x, Ks):
     # Estimato B and Le
     B = Q_se + Q_ee + Q_ss + tf.reshape(Ze, [-1, n, n])
     Ls = tf.get_collection("base_graph_kernel")[0]
-    # Lt = apprx_L(B, Ls)
-    Lt = calc_L(n, B, Ls)
+    Lt = approx_L(B, Ls)
+    # Lt = calc_L(n, B, Ls)
     #Lt = tf.py_func(myPrint, [Lt], tf.float32)
     # Laplacian Normalization
     Lt = scaled_laplacian_tf(Lt, n)

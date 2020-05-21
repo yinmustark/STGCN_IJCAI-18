@@ -28,6 +28,9 @@ warnings.filterwarnings("ignore")
 
 import argparse
 
+config = tf.ConfigProto() 
+config.gpu_options.allow_growth = True
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_route', type=int, default=228)
 parser.add_argument('--n_his', type=int, default=12)
