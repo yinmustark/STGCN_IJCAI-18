@@ -47,8 +47,9 @@ parser.add_argument('--inf_mode', type=str, default='merge')
 parser.add_argument('--beta', type=float, default=0.01)
 parser.add_argument('--rank', type=int, nargs=2, default=[10,3])
 parser.add_argument('--I', type=int, default=6)
-parser.add_argument('-pe', '--pretrain_epoch', type=int, default=26)
+parser.add_argument('-pe', '--pretrain_epoch', type=int, default=31)
 parser.add_argument('-p', '--save_path', type=str, default='./output/')
+parser.add_argument('-t', '--test', action='store_true')
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -82,5 +83,8 @@ PeMS = data_gen(pjoin('./dataset', data_file), (n_train, n_val, n_test), n, n_hi
 print(f'>> Loading dataset with Mean: {PeMS.mean:.2f}, STD: {PeMS.std:.2f}')
 
 if __name__ == '__main__':
-    model_train(PeMS, blocks, args, sum_path)
-    model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode)
+    if args.test:
+        model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode, load_path=pjoin(args.save_path, 'models'))
+    else:
+        model_train(PeMS, blocks, args, sum_path)
+        model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode, load_path=pjoin(args.save_path, 'models'))

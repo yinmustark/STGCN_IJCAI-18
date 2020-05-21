@@ -28,9 +28,9 @@ def scaled_laplacian_tf(L, n):
     D12 = tf.linalg.diag(1. / tf.sqrt(dp))
     Lr = tf.matmul(tf.matmul(D12, L), D12)
     # Lr = L
+    # eigv lambda_max \approx 2.0, the largest eigenvalues of L.
     eigv = tf.py_func(max_eigs, [Lr], tf.float32)
-    # lambda_max \approx 2.0, the largest eigenvalues of L.
-    # eigv, _ = tf.linalg.eigh(Lr)
+    # eigv = tf.linalg.eigh(Lr)[0][:,-1]
     lambda_max = tf.reshape(eigv, [-1, 1, 1])
     return 2 * Lr / lambda_max - tf.eye(n, batch_shape=[1])
     #return L
@@ -81,7 +81,7 @@ def unfold_normalization(A):
     A = tf.transpose(A, [0, 1, 3, 2])
     A = tf.reshape(A, [-1, n_his*channel, n])
     A = A - tf.reduce_mean(A, axis=1, keepdims=True)
-    A_norm = A / tf.sqrt(tf.reduce_sum(A ** 2, axis=1, keep_dims=True) + 1e-8)
+    A_norm = A / tf.sqrt(float(n))
     return A_norm
 
 def conv_2d(inp):
@@ -98,7 +98,7 @@ def conv_2d(inp):
     out = tf.layers.batch_normalization(out)
     return tf.nn.relu(out)
 
-def approx_L(B, Ls):
+def calc_L_series_sum(B, Ls):
     I = tf.get_collection('series_iteration')[0]
     eta = -1
     factor = tf.matmul(B, Ls)
@@ -113,7 +113,7 @@ def approx_L(B, Ls):
         Le = Le + eta * prod
     return Ls + Le
 
-def calc_L(n, B, Ls):
+def calc_L_inv(n, B, Ls):
     factor = tf.matmul(Ls, B)
     I = tf.eye(n, batch_shape=[1])
     inv = tf.linalg.inv(I + factor)
@@ -134,8 +134,8 @@ def laplacian_estimator(x, Ks):
     # Estimato B and Le
     B = Q_se + Q_ee + Q_ss + tf.reshape(Ze, [-1, n, n])
     Ls = tf.get_collection("base_graph_kernel")[0]
-    Lt = approx_L(B, Ls)
-    # Lt = calc_L(n, B, Ls)
+    Lt = calc_L_series_sum(B, Ls)
+    #Lt = calc_L_inv(n, B, Ls)
     #Lt = tf.py_func(myPrint, [Lt], tf.float32)
     # Laplacian Normalization
     Lt = scaled_laplacian_tf(Lt, n)
