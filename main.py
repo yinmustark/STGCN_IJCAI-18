@@ -21,6 +21,7 @@ from utils.math_graph import *
 from data_loader.data_utils import *
 from models.trainer import model_train
 from models.tester import model_test
+from utils.dtw_matrix import dtw_adj_matrix
 
 import argparse
 
@@ -37,6 +38,8 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--opt', type=str, default='RMSProp')
 parser.add_argument('--graph', type=str, default='default')
 parser.add_argument('--inf_mode', type=str, default='merge')
+parser.add_argument('-T', '--time_interval', type=int, default=12)
+parser.add_argument('-k', '--topk', type=int, default=8)
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -47,11 +50,12 @@ Ks, Kt = args.ks, args.kt
 blocks = [[1, 32, 64], [64, 32, 128]]
 
 # Load wighted adjacency matrix W
-if args.graph == 'default':
-    W = weight_matrix(pjoin('./dataset', f'PeMSD7_W_{n}.csv'))
-else:
+# if args.graph == 'default':
+#     W = weight_matrix(pjoin('./dataset', f'PeMSD7_W_{n}.csv'))
+# else:
     # load customized graph weight matrix
-    W = weight_matrix(pjoin('./dataset', args.graph))
+n_train, n_val, n_test = 34, 5, 5
+W = dtw_adj_matrix(args, n_train)
 
 # Calculate graph kernel
 L = scaled_laplacian(W)
@@ -61,7 +65,6 @@ tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lk), tf.floa
 
 # Data Preprocessing
 data_file = f'PeMSD7_V_{n}.csv'
-n_train, n_val, n_test = 34, 5, 5
 PeMS = data_gen(pjoin('./dataset', data_file), (n_train, n_val, n_test), n, n_his + n_pred)
 print(f'>> Loading dataset with Mean: {PeMS.mean:.2f}, STD: {PeMS.std:.2f}')
 
