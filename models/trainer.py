@@ -99,6 +99,6 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
             print(f'Epoch {i:2d} Inference Time {time.time() - start_time:.3f}s')
 
             if (i + 1) % args.save == 0:
-                model_save(sess, global_steps, 'STGCN')
+                model_save(sess, global_steps, 'STGCN', pjoin(args.path, 'models'))
         writer.close()
     print('Training model finished!')

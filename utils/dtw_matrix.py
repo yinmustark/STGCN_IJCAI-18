@@ -12,7 +12,7 @@ def dtw_distance(X, Y, T):
     M_c = np.zeros((nt, nt))
     for i in range(nt):
         for j in range(max(i-T, 0), min(i+T+1, nt)):
-            M[i, j] = np.sum(np.abs(X[i,:] - Y[j,:]), axis=-1)
+            M[i, j] = np.linalg.norm(X[i,:] - Y[j,:])
             if i == 0 and j == 0:
                 plus = 0
             elif i == 0:
@@ -20,21 +20,25 @@ def dtw_distance(X, Y, T):
             elif j == 0:
                 plus = M[i-1, j]
             elif j == i-T:
-                plus = min(M[i-1, j-1], M[i-1, j])
+                plus = np.min([M[i-1, j-1], M[i-1, j]])
             elif j == i+T:
-                plus = min(M[i-1, j-1], M[i, j-1])
+                plus = np.min([M[i-1, j-1], M[i, j-1]])
             else:
-                plus = min(M[i-1, j-1], M[i, j-1], M[i-1, j])
+                plus = np.min([M[i-1, j-1], M[i, j-1], M[i-1, j]])
             M_c[i, j] = M[i, j] ** 2 + plus
     return np.sqrt(M_c[nt-1, nt-1])
 
 @jit
 def dtw_weight_matrix(X, n, args):
     W = np.zeros((n, n))
+    mem = np.zeros((n, n))
     for i in range(n):
         list_dist = []
         for j in range(n):
-            list_dist.append(dtw_distance(X[i], X[j], args.time_interval))
+            if i != j and not mem[i, j]:
+                mem[i, j] = dtw_distance(X[i], X[j], args.time_interval)
+                mem[j, i] = mem[i, j]
+            list_dist.append(mem[i, j])
         top_arg = np.argsort(list_dist)
         for k in range(args.topk):
             jj = top_arg[k]

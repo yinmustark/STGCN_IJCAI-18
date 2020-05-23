@@ -40,6 +40,7 @@ parser.add_argument('--graph', type=str, default='default')
 parser.add_argument('--inf_mode', type=str, default='merge')
 parser.add_argument('-T', '--time_interval', type=int, default=12)
 parser.add_argument('-k', '--topk', type=int, default=8)
+parser.add_argument('-p', '--path', type=str, default='./output')
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -69,5 +70,5 @@ PeMS = data_gen(pjoin('./dataset', data_file), (n_train, n_val, n_test), n, n_hi
 print(f'>> Loading dataset with Mean: {PeMS.mean:.2f}, STD: {PeMS.std:.2f}')
 
 if __name__ == '__main__':
-    model_train(PeMS, blocks, args)
-    model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode)
+    model_train(PeMS, blocks, args, pjoin(args.path, 'tensorboard'))
+    model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode, pjoin(args.path, 'models'))
