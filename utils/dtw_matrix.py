@@ -12,39 +12,38 @@ def dtw_distance(X, Y, T):
     M_c = np.zeros((nt, nt))
     for i in range(nt):
         for j in range(max(i-T, 0), min(i+T+1, nt)):
-            M[i, j] = np.linalg.norm(X[i,:] - Y[j,:])
+            tmp = np.sum((X[i,:] - Y[j,:]) ** 2)
+            M[i, j] = np.sqrt(tmp)
             if i == 0 and j == 0:
                 plus = 0
             elif i == 0:
-                plus = M[i, j-1]
+                plus = M_c[i, j-1]
             elif j == 0:
-                plus = M[i-1, j]
+                plus = M_c[i-1, j]
             elif j == i-T:
-                plus = np.min([M[i-1, j-1], M[i-1, j]])
+                plus = min(M_c[i-1, j-1], M_c[i-1, j])
             elif j == i+T:
-                plus = np.min([M[i-1, j-1], M[i, j-1]])
+                plus = min(M_c[i-1, j-1], M_c[i, j-1])
             else:
-                plus = np.min([M[i-1, j-1], M[i, j-1], M[i-1, j]])
-            M_c[i, j] = M[i, j] ** 2 + plus
+                plus = min(M_c[i-1, j-1], M_c[i, j-1], M_c[i-1, j])
+            M_c[i, j] = tmp + plus
     return np.sqrt(M_c[nt-1, nt-1])
 
 @jit
 def dtw_weight_matrix(X, n, args):
     W = np.zeros((n, n))
-    mem = np.zeros((n, n))
+    dist = np.zeros((n, n))
     for i in range(n):
-        list_dist = []
         for j in range(n):
-            if i != j and not mem[i, j]:
-                mem[i, j] = dtw_distance(X[i], X[j], args.time_interval)
-                mem[j, i] = mem[i, j]
-            list_dist.append(mem[i, j])
-        top_arg = np.argsort(list_dist)
-        for k in range(args.topk):
-            jj = top_arg[k]
-            W[i, jj] = W[jj, i] = 1
-        if i % 10 == 0:
+            if i != j and not dist[i, j]:
+                dist[i, j] = dtw_distance(X[i], X[j], args.time_interval)
+                dist[j, i] = dist[i, j]
+        if(i%50 == 0):
             print(i)
+    dist_sort_arg = np.argsort(dist, axis=1)
+    for i in range(n):
+        j_indices = dist_sort_arg[i, :args.topk]
+        W[i, j_indices] = W[j_indices, i] = 1
     return W
 
 def dtw_adj_matrix(args, n_train):
