@@ -1,0 +1,1 @@
+python main.py --graph="./dataset/graph/adj_mx_bay.pkl" --file_path='./dataset/PEMS-BAY' --output='./output_bay' --n_route=325

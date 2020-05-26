@@ -9,7 +9,7 @@ from utils.math_utils import z_score
 
 import numpy as np
 import pandas as pd
-
+from os.path import join as pjoin
 
 class Dataset(object):
     def __init__(self, data, stats):
@@ -67,14 +67,17 @@ def data_gen(file_path, data_config, n_route, n_frame=21, day_slot=288):
     '''
     n_train, n_val, n_test = data_config
     # generate training, validation and test data
-    try:
-        data_seq = pd.read_csv(file_path, header=None).values
-    except FileNotFoundError:
-        print(f'ERROR: input file was not found in {file_path}.')
+    # try:
+    #     data_seq = pd.read_csv(file_path, header=None).values
+    # except FileNotFoundError:
+    #     print(f'ERROR: input file was not found in {file_path}.')
 
-    seq_train = seq_gen(n_train, data_seq, 0, n_frame, n_route, day_slot)
-    seq_val = seq_gen(n_val, data_seq, n_train, n_frame, n_route, day_slot)
-    seq_test = seq_gen(n_test, data_seq, n_train + n_val, n_frame, n_route, day_slot)
+    train_data = np.load(pjoin(file_path, 'train.npz'))
+    seq_train = np.concatenate([train_data['x'][...,0:1], train_data['y'][...,0:1]], axis=1)
+    test_data = np.load(pjoin(file_path, 'test.npz'))
+    seq_test = np.concatenate([test_data['x'][...,0:1], test_data['y'][...,0:1]], axis=1)
+    val_data = np.load(pjoin(file_path, 'val.npz'))
+    seq_val = np.concatenate([val_data['x'][...,0:1], val_data['y'][...,0:1]], axis=1)
 
     # x_stats: dict, the stats for the train dataset, including the value of mean and standard deviation.
     x_stats = {'mean': np.mean(seq_train), 'std': np.std(seq_train)}
