@@ -51,7 +51,7 @@ blocks = [[1, 32, 64], [64, 32, 128]]
 # Load wighted adjacency matrix W
 
 # load customized graph weight matrix
-W = load_adj(args.graph)
+W = load_adj(pjoin(args.file_path, 'adj_mx.pkl'))
 
 L = scaled_laplacian(W)
 # Calculate graph kernel

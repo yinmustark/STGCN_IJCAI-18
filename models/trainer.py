@@ -94,7 +94,7 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
             for ix in tmp_idx:
                 assert len(min_va_val) == 9
                 va, te = min_va_val[ix - 2:ix + 1], min_val[ix - 2:ix + 1]
-                print(f'Time Step {step_idx[int(ix/3) + 1]}: '
+                print(f'Time Step {step_idx[int(ix/3)] + 1}: '
                       f'MAPE {va[0]:7.3%}, {te[0]:7.3%}; '
                       f'MAE  {va[1]:4.3f}, {te[1]:4.3f}; '
                       f'RMSE {va[2]:6.3f}, {te[2]:6.3f}.')

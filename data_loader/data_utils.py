@@ -51,12 +51,11 @@ def seq_gen(len_seq, data_seq, offset, n_frame, n_route, day_slot, C_0=1):
     #         sta = (i + offset) * day_slot + j
     #         end = sta + n_frame
     #         tmp_seq[i * n_slot + j, :, :, :] = np.reshape(data_seq[sta:end, :], [n_frame, n_route, C_0])
-    n_max = len(data_seq)
-    tmp_seq = np.zeros((len_seq, n_frame, n_route, C_0))
+    tmp_seq = np.zeros((len_seq - n_frame + 1, n_frame, n_route, C_0))
     for i in range(len_seq):
         sta = i + offset
         end = sta + n_frame
-        if end > n_max:
+        if end > len_seq:
             break
         tmp_seq[i, :, :, :] = np.reshape(data_seq[sta:end, :], [n_frame, n_route, C_0])
     return tmp_seq
@@ -85,14 +84,18 @@ def data_gen(file_path, data_config, n_route, n_frame=24, day_slot=288):
         except FileNotFoundError:
             print(f'ERROR: input file was not found in {file_path}.')
 
-        n_samples = len(data_seq)
+        seq_all = seq_gen(len(data_seq), data_seq, 0, n_frame, n_route, day_slot)
+        n_samples = len(seq_all)
         n_train = round(n_samples * 0.7)
         n_test = round(n_samples * 0.2)
         n_val = n_samples - n_train - n_test
 
-        seq_train = seq_gen(n_train, data_seq, 0, n_frame, n_route, day_slot)
-        seq_val = seq_gen(n_val, data_seq, n_train, n_frame, n_route, day_slot)
-        seq_test = seq_gen(n_test, data_seq, n_train + n_val, n_frame, n_route, day_slot)
+        seq_train = seq_all[:n_train]
+        seq_val = seq_all[n_train:n_train+n_val]
+        seq_test = seq_all[n_train+n_val:]
+        # seq_train = seq_gen(n_train, data_seq, 0, n_frame, n_route, day_slot)
+        # seq_val = seq_gen(n_val, data_seq, n_train, n_frame, n_route, day_slot)
+        # seq_test = seq_gen(n_test, data_seq, n_train + n_val, n_frame, n_route, day_slot)
 
         np.save(pjoin(file_path, 'train.npy'), seq_train)
         np.save(pjoin(file_path, 'val.npy'), seq_val)
@@ -107,8 +110,6 @@ def data_gen(file_path, data_config, n_route, n_frame=24, day_slot=288):
     # seq_val = np.concatenate([val_data['x'][...,0:1], val_data['y'][...,0:1]], axis=1)
 
 
-    import pdb
-    pdb.set_trace()
     # x_stats: dict, the stats for the train dataset, including the value of mean and standard deviation.
     x_stats = {'mean': np.mean(seq_train), 'std': np.std(seq_train)}
 
