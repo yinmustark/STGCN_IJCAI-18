@@ -51,8 +51,9 @@ blocks = [[1, 32, 64], [64, 32, 128]]
 # Load wighted adjacency matrix W
 
 # load customized graph weight matrix
-L = load_adj(args.graph)
+W = load_adj(args.graph)
 
+L = scaled_laplacian(W)
 # Calculate graph kernel
 # Alternative approximation method: 1st approx - first_approx(W, n).
 Lk = cheb_poly_approx(L, Ks, n)
@@ -65,4 +66,5 @@ print(f'>> Loading dataset with Mean: {PeMS.mean:.2f}, STD: {PeMS.std:.2f}')
 
 if __name__ == '__main__':
     model_train(PeMS, blocks, args, pjoin(args.output, 'tensorboard'))
-    model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode, pjoin(args.output, 'models'))
+    #model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode, pjoin(args.output, 'models'))
+    model_test(PeMS, 200, n_his, n_pred, args.inf_mode, pjoin(args.output, 'models'))

@@ -5,18 +5,16 @@
 # @IDE      : PyCharm
 # @Github   : https://github.com/VeritasYin/Project_Orion
 
+import pickle as pkl
 import numpy as np
 import pandas as pd
-import pickle as pkl
 from scipy.sparse.linalg import eigs
 
 
 def load_adj(file_path):
     with open(file_path, 'rb') as f:
-        L = pkl.load(f, encoding='latin1')[-1]
-    n = L.shape[0]
-    lambda_max = eigs(L, k=1, which='LR')[0][0].real
-    return np.mat(2 * L / lambda_max - np.identity(n))
+        W = pkl.load(f, encoding='latin1')[-1]
+    return np.array(W)
 
 def scaled_laplacian(W):
     '''

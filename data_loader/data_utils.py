@@ -9,7 +9,7 @@ from utils.math_utils import z_score
 
 import numpy as np
 import pandas as pd
-from os.path import join as pjoin
+from os.path import join as pjoin, exists
 
 class Dataset(object):
     def __init__(self, data, stats):
@@ -54,7 +54,7 @@ def seq_gen(len_seq, data_seq, offset, n_frame, n_route, day_slot, C_0=1):
     return tmp_seq
 
 
-def data_gen(file_path, data_config, n_route, n_frame=21, day_slot=288):
+def data_gen(file_path, data_config, n_route, n_frame=24, day_slot=288):
     '''
     Source file load and dataset generation.
     :param file_path: str, the file path of data source.
@@ -66,11 +66,29 @@ def data_gen(file_path, data_config, n_route, n_frame=21, day_slot=288):
     :return: dict, dataset that contains training, validation and test with stats.
     '''
     n_train, n_val, n_test = data_config
-    # generate training, validation and test data
-    # try:
-    #     data_seq = pd.read_csv(file_path, header=None).values
-    # except FileNotFoundError:
-    #     print(f'ERROR: input file was not found in {file_path}.')
+    #generate training, validation and test data
+    # if exists(pjoin(file_path, 'train.npy')):
+    #     seq_train = np.load(pjoin(file_path, 'train.npy'))
+    #     seq_test = np.load(pjoin(file_path, 'test.npy'))
+    #     seq_val = np.load(pjoin(file_path, 'val.npy'))
+    # else:
+    #     try:
+    #         data_seq = pd.read_hdf(pjoin(file_path, 'data.h5')).values
+    #     except FileNotFoundError:
+    #         print(f'ERROR: input file was not found in {file_path}.')
+
+    #     n_samples = len(data_seq)
+    #     n_train = round(n_samples * 0.7)
+    #     n_test = round(n_samples * 0.2)
+    #     n_val = n_samples - n_train - n_test
+
+    #     seq_train = seq_gen(n_train, data_seq, 0, n_frame, n_route, day_slot)
+    #     seq_val = seq_gen(n_val, data_seq, n_train, n_frame, n_route, day_slot)
+    #     seq_test = seq_gen(n_test, data_seq, n_train + n_val, n_frame, n_route, day_slot)
+
+    #     np.save(pjoin(file_path, 'train.npy'), seq_train)
+    #     np.save(pjoin(file_path, 'val.npy'), seq_val)
+    #     np.save(pjoin(file_path, 'test.npy'), seq_test)
 
     train_data = np.load(pjoin(file_path, 'train.npz'))
     seq_train = np.concatenate([train_data['x'][...,0:1], train_data['y'][...,0:1]], axis=1)
