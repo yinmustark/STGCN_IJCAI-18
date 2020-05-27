@@ -117,8 +117,6 @@ def model_test(inputs, batch_size, n_his, n_pred, inf_mode, load_path='./output/
         x_test, x_stats = inputs.get_data('test'), inputs.get_stats()
 
         y_test, len_test = multi_pred(test_sess, pred, x_test, batch_size, n_his, n_pred, step_idx)
-        import pdb
-        pdb.set_trace()
         evl = evaluation(x_test[0:len_test, step_idx + n_his, :, :], y_test, x_stats)
 
         for ix in tmp_idx:
