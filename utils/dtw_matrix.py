@@ -47,8 +47,8 @@ def dtw_weight_matrix(X, n, args):
     return W
 
 def dtw_adj_matrix(args, n_train):
-    weight_path = pjoin('./dataset/graph/', f'dtw_adj_T{args.time_interval}_k{args.topk}.npy')
-    if pexists(weight_path):
+    weight_path = pjoin('./dataset/', f'dtw_adj_T{args.time_interval}_k{args.topk}.npy')
+    if pexists(weight_path) and not args.overwrite:
         return np.load(weight_path)
     
     n = args.n_route
@@ -68,7 +68,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_route', type=int, default=228)
     parser.add_argument('-T', '--time_interval', type=int, default=12)
-    parser.add_argument('-k', '--topk', type=int, default=8)
+    parser.add_argument('-k', '--topk', type=int, default=5)
+    parser.add_argument('-ow', '--overwrite', action='store_true')
     args = parser.parse_args()
 
     print(dtw_adj_matrix(args, 34).sum() / (228*228))
