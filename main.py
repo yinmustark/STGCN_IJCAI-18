@@ -21,7 +21,7 @@ from utils.math_graph import *
 from data_loader.data_utils import *
 from models.trainer import model_train
 from models.tester import model_test
-from utils.dtw_matrix import dtw_adj_matrix
+from utils.dtw_matrix import *
 
 import argparse
 
@@ -41,6 +41,9 @@ parser.add_argument('--inf_mode', type=str, default='merge')
 parser.add_argument('-T', '--time_interval', type=int, default=12)
 parser.add_argument('-k', '--topk', type=int, default=8)
 parser.add_argument('-p', '--path', type=str, default='./output')
+parser.add_argument('-s', '--sigma', type=float, default=0.5)
+parser.add_argument('-e', '--epsilon', type=float, default=0.3)
+parser.add_argument('-ow', '--overwrite', action='store_true')
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -56,7 +59,7 @@ blocks = [[1, 32, 64], [64, 32, 128]]
 # else:
     # load customized graph weight matrix
 n_train, n_val, n_test = 34, 5, 5
-W = dtw_adj_matrix(args, n_train)
+W = fusion_adj(args, n_train, pjoin('./dataset', f'PeMSD7_W_{n}.csv'))
 
 # Calculate graph kernel
 L = scaled_laplacian(W)
