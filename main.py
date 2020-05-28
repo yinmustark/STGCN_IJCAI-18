@@ -28,7 +28,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_route', type=int, default=228)
 parser.add_argument('--n_his', type=int, default=12)
-parser.add_argument('--n_pred', type=int, default=9)
+parser.add_argument('--n_pred', type=int, default=12)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--epoch', type=int, default=50)
 parser.add_argument('--save', type=int, default=10)
