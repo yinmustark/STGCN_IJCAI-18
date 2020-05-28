@@ -139,7 +139,7 @@ def spatio_conv_layer(x, Ks, c_in, c_out):
     #conv_inp = tf.nn.relu(x_gconv)
     conv_inp = x_gconv
 
-    ww = tf.get_variable(name=f'w_11_conv', initializer=tf.random.uniform([1, 1, 2*c_out, c_out]), dtype=tf.float32)
+    ww = tf.get_variable(name=f'w_11_conv', shape=[1, 1, 2*c_out, c_out], dtype=tf.float32)
     tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ww))
     bb = tf.get_variable(name=f'b_11_conv', initializer=tf.zeros([c_out]), dtype=tf.float32)
     conv = tf.nn.conv2d(conv_inp, ww, strides=[1, 1, 1, 1], padding='SAME') + bb
