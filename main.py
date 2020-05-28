@@ -41,6 +41,7 @@ parser.add_argument('--inf_mode', type=str, default='merge')
 parser.add_argument('-T', '--time_interval', type=int, default=12)
 parser.add_argument('-k', '--topk', type=int, default=5)
 parser.add_argument('-p', '--path', type=str, default='./output')
+parser.add_argument('-ow', '--overwrite', action='store_true')
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
