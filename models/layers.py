@@ -8,7 +8,7 @@
 import tensorflow as tf
 
 
-def gconv(x, theta, Ks, c_in, c_out):
+def gconv(x, theta, Ks, c_in, c_out, ind_kernel):
     '''
     Spectral-based graph convolution function.
     :param x: tensor, [batch_size, n_route, c_in].
@@ -19,7 +19,7 @@ def gconv(x, theta, Ks, c_in, c_out):
     :return: tensor, [batch_size, n_route, c_out].
     '''
     # graph kernel: tensor, [n_route, Ks*n_route]
-    kernel = tf.get_collection('graph_kernel')[0]
+    kernel = tf.get_collection('graph_kernel')[ind_kernel]
     n = tf.shape(kernel)[0]
     # x -> [batch_size, c_in, n_route] -> [batch_size*c_in, n_route]
     x_tmp = tf.reshape(tf.transpose(x, [0, 2, 1]), [-1, n])
@@ -122,14 +122,29 @@ def spatio_conv_layer(x, Ks, c_in, c_out):
     else:
         x_input = x
 
-    ws = tf.get_variable(name='ws', shape=[Ks * c_in, c_out], dtype=tf.float32)
-    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ws))
-    variable_summaries(ws, 'theta')
-    bs = tf.get_variable(name='bs', initializer=tf.zeros([c_out]), dtype=tf.float32)
+    ws0 = tf.get_variable(name='ws0', shape=[Ks * c_in, c_out], dtype=tf.float32)
+    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ws0))
+    variable_summaries(ws0, 'theta')
+    bs0 = tf.get_variable(name='bs0', initializer=tf.zeros([c_out]), dtype=tf.float32)
+
+    ws1 = tf.get_variable(name='ws1', shape=[Ks * c_in, c_out], dtype=tf.float32)
+    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ws1))
+    variable_summaries(ws1, 'theta')
+    bs1 = tf.get_variable(name='bs1', initializer=tf.zeros([c_out]), dtype=tf.float32)
     # x -> [batch_size*time_step, n_route, c_in] -> [batch_size*time_step, n_route, c_out]
-    x_gconv = gconv(tf.reshape(x, [-1, n, c_in]), ws, Ks, c_in, c_out) + bs
+    #x_gconv = gconv(tf.reshape(x, [-1, n, c_in]), ws, Ks, c_in, c_out) + bs
+    x_gconv0 = gconv(tf.reshape(x, [-1, n, c_in]), ws0, Ks, c_in, c_out, 0) + bs0
+    x_gconv1 = gconv(tf.reshape(x, [-1, n, c_in]), ws1, Ks, c_in, c_out, 1) + bs1
+    x_gconv = tf.reshape(tf.concat([x_gconv0, x_gconv1], axis=-1), [-1, 1, n, 2*c_out])
+    #conv_inp = tf.nn.relu(x_gconv)
+    conv_inp = x_gconv
+
+    ww = tf.get_variable(name=f'w_11_conv', initializer=tf.random.uniform([1, 1, 2*c_out, c_out]), dtype=tf.float32)
+    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ww))
+    bb = tf.get_variable(name=f'b_11_conv', initializer=tf.zeros([c_out]), dtype=tf.float32)
+    conv = tf.nn.conv2d(conv_inp, ww, strides=[1, 1, 1, 1], padding='SAME') + bb
     # x_g -> [batch_size, time_step, n_route, c_out]
-    x_gc = tf.reshape(x_gconv, [-1, T, n, c_out])
+    x_gc = tf.reshape(conv, [-1, T, n, c_out])
     return tf.nn.relu(x_gc[:, :, :, 0:c_out] + x_input)
 
 

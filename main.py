@@ -57,13 +57,17 @@ blocks = [[1, 32, 64], [64, 32, 128]]
 # else:
     # load customized graph weight matrix
 n_train, n_val, n_test = 34, 5, 5
-W = dtw_adj_matrix(args, n_train)
+Wt = dtw_adj_matrix(args, n_train)
+Ws = weight_matrix(pjoin('./dataset', f'PeMSD7_W_{n}.csv'))
 
 # Calculate graph kernel
-L = scaled_laplacian(W)
+Lt = scaled_laplacian(Wt)
+Ls = scaled_laplacian(Ws)
 # Alternative approximation method: 1st approx - first_approx(W, n).
-Lk = cheb_poly_approx(L, Ks, n)
-tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lk), tf.float32))
+Lkt = cheb_poly_approx(Lt, Ks, n)
+Lks = cheb_poly_approx(Ls, Ks, n)
+tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lkt), tf.float32))
+tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lks), tf.float32))
 
 # Data Preprocessing
 data_file = f'PeMSD7_V_{n}.csv'
