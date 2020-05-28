@@ -127,14 +127,15 @@ def spatio_conv_layer(x, Ks, c_in, c_out):
     variable_summaries(ws0, 'theta')
     bs0 = tf.get_variable(name='bs0', initializer=tf.zeros([c_out]), dtype=tf.float32)
 
-    ws1 = tf.get_variable(name='ws1', shape=[Ks * c_in, c_out], dtype=tf.float32)
-    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ws1))
-    variable_summaries(ws1, 'theta')
-    bs1 = tf.get_variable(name='bs1', initializer=tf.zeros([c_out]), dtype=tf.float32)
+    # ws1 = tf.get_variable(name='ws1', shape=[Ks * c_in, c_out], dtype=tf.float32)
+    # tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ws1))
+    # variable_summaries(ws1, 'theta')
+    # bs1 = tf.get_variable(name='bs1', initializer=tf.zeros([c_out]), dtype=tf.float32)
     # x -> [batch_size*time_step, n_route, c_in] -> [batch_size*time_step, n_route, c_out]
     #x_gconv = gconv(tf.reshape(x, [-1, n, c_in]), ws, Ks, c_in, c_out) + bs
     x_gconv0 = gconv(tf.reshape(x, [-1, n, c_in]), ws0, Ks, c_in, c_out, 0) + bs0
-    x_gconv1 = gconv(tf.reshape(x, [-1, n, c_in]), ws1, Ks, c_in, c_out, 1) + bs1
+    #x_gconv1 = gconv(tf.reshape(x, [-1, n, c_in]), ws1, Ks, c_in, c_out, 1) + bs1
+    x_gconv1 = gconv(tf.reshape(x, [-1, n, c_in]), ws0, Ks, c_in, c_out, 1) + bs0
     x_gconv = tf.reshape(tf.concat([x_gconv0, x_gconv1], axis=-1), [-1, 1, n, 2*c_out])
     #conv_inp = tf.nn.relu(x_gconv)
     conv_inp = x_gconv
