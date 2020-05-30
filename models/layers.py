@@ -136,16 +136,18 @@ def spatio_conv_layer(x, Ks, c_in, c_out):
     x_gconv0 = gconv(tf.reshape(x, [-1, n, c_in]), ws0, Ks, c_in, c_out, 0) + bs0
     #x_gconv1 = gconv(tf.reshape(x, [-1, n, c_in]), ws1, Ks, c_in, c_out, 1) + bs1
     x_gconv1 = gconv(tf.reshape(x, [-1, n, c_in]), ws0, Ks, c_in, c_out, 1) + bs0
-    x_gconv = tf.reshape(tf.concat([x_gconv0, x_gconv1], axis=-1), [-1, 1, n, 2*c_out])
+    #x_gconv = tf.reshape(tf.concat([x_gconv0, x_gconv1], axis=-1), [-1, 1, n, 2*c_out])
     #conv_inp = tf.nn.relu(x_gconv)
-    conv_inp = x_gconv
+    alpha = tf.get_variable(name='alpha', shape=[c_out], dtype=tf.float32)
+    score = tf.nn.sigmoid(alpha)
+    x_gconv = tf.multiply(score, x_gconv0) + tf.multiply((1 - score), x_gconv1)
 
-    ww = tf.get_variable(name=f'w_11_conv', shape=[1, 1, 2*c_out, c_out], dtype=tf.float32)
-    tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ww))
-    bb = tf.get_variable(name=f'b_11_conv', initializer=tf.zeros([c_out]), dtype=tf.float32)
-    conv = tf.nn.conv2d(conv_inp, ww, strides=[1, 1, 1, 1], padding='SAME') + bb
+    # ww = tf.get_variable(name=f'w_11_conv', shape=[1, 1, 2*c_out, c_out], dtype=tf.float32)
+    # tf.add_to_collection(name='weight_decay', value=tf.nn.l2_loss(ww))
+    # bb = tf.get_variable(name=f'b_11_conv', initializer=tf.zeros([c_out]), dtype=tf.float32)
+    # conv = tf.nn.conv2d(conv_inp, ww, strides=[1, 1, 1, 1], padding='SAME') + bb
     # x_g -> [batch_size, time_step, n_route, c_out]
-    x_gc = tf.reshape(conv, [-1, T, n, c_out])
+    x_gc = tf.reshape(x_gconv, [-1, T, n, c_out])
     return tf.nn.relu(x_gc[:, :, :, 0:c_out] + x_input)
 
 
