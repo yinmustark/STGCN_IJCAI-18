@@ -13,10 +13,6 @@ from os.path import join as pjoin
 
 import tensorflow as tf
 
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-tf.Session(config=config)
-
 from utils.math_graph import *
 from data_loader.data_utils import *
 from models.trainer import model_train
@@ -27,7 +23,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_route', type=int, default=228)
 parser.add_argument('--n_his', type=int, default=12)
-parser.add_argument('--n_pred', type=int, default=9)
+parser.add_argument('--n_pred', type=int, default=12)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--epoch', type=int, default=50)
 parser.add_argument('--save', type=int, default=10)
@@ -37,9 +33,16 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--opt', type=str, default='RMSProp')
 parser.add_argument('--graph', type=str, default='default')
 parser.add_argument('--inf_mode', type=str, default='merge')
+parser.add_argument('-gf', '--gpu_fraction', type=float, default=0.4)
+parser.add_argument('-c', '--channel', type=int, default=10)
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction = args.gpu_fraction
+tf.add_to_collection('gpu_config', value=config)
 
 n, n_his, n_pred = args.n_route, args.n_his, args.n_pred
 Ks, Kt = args.ks, args.kt

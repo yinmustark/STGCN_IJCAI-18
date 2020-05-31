@@ -30,6 +30,16 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
     x = tf.placeholder(tf.float32, [None, n_his + 1, n, 1], name='data_input')
     keep_prob = tf.placeholder(tf.float32, name='keep_prob')
 
+    E1 = tf.get_variable('emb1', initializer=tf.random.uniform([n, args.channel]), dtype=tf.float32)
+    E2 = tf.get_variable('emb2', initializer=tf.random.uniform([args.channel, n]), dtype=tf.float32)
+    A = tf.nn.softmax(tf.nn.relu(tf.matmul(E1, E2)))
+    mat = A
+    adpt_kernels = [A]
+    for i in range(Ks-1):
+        mat = tf.matmul(A, mat)
+        adpt_kernels.append(mat)
+    adj = tf.concat(adpt_kernels, axis=-1)
+    tf.add_to_collection(name='graph_kernel', value=adj)
     # Define model loss
     train_loss, pred = build_model(x, n_his, Ks, Kt, blocks, keep_prob)
     tf.summary.scalar('train_loss', train_loss)
@@ -57,7 +67,8 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
 
     merged = tf.summary.merge_all()
 
-    with tf.Session() as sess:
+    config = tf.get_collection('gpu_config')[0]
+    with tf.Session(config=config) as sess:
         writer = tf.summary.FileWriter(pjoin(sum_path, 'train'), sess.graph)
         sess.run(tf.global_variables_initializer())
 
