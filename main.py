@@ -17,6 +17,7 @@ from utils.math_graph import *
 from data_loader.data_utils import *
 from models.trainer import model_train
 from models.tester import model_test
+from utils.dtw_matrix import dtw_adj_matrix
 
 import argparse
 
@@ -33,8 +34,13 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--opt', type=str, default='RMSProp')
 parser.add_argument('--graph', type=str, default='default')
 parser.add_argument('--inf_mode', type=str, default='merge')
-parser.add_argument('-gf', '--gpu_fraction', type=float, default=0.4)
-parser.add_argument('-c', '--channel', type=int, default=10)
+parser.add_argument('-T', '--time_interval', type=int, default=12)
+parser.add_argument('-k', '--topk', type=int, default=5)
+parser.add_argument('-p', '--path', type=str, default='./output')
+parser.add_argument('-ow', '--overwrite', action='store_true')
+parser.add_argument('-gf', '--gpu_fraction', type=float, default=0.5)
+parser.add_argument('--gpu', type=int, default=0)
+
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -49,25 +55,34 @@ Ks, Kt = args.ks, args.kt
 # blocks: settings of channel size in st_conv_blocks / bottleneck design
 blocks = [[1, 32, 64], [64, 32, 128]]
 
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction = args.gpu_fraction
+tf.add_to_collection('gpu_config', value=config)
+
 # Load wighted adjacency matrix W
-if args.graph == 'default':
-    W = weight_matrix(pjoin('./dataset', f'PeMSD7_W_{n}.csv'))
-else:
+# if args.graph == 'default':
+#     W = weight_matrix(pjoin('./dataset', f'PeMSD7_W_{n}.csv'))
+# else:
     # load customized graph weight matrix
-    W = weight_matrix(pjoin('./dataset', args.graph))
+n_train, n_val, n_test = 34, 5, 5
+Wt = dtw_adj_matrix(args, n_train)
+Ws = weight_matrix(pjoin('./dataset', f'PeMSD7_W_{n}.csv'))
 
 # Calculate graph kernel
-L = scaled_laplacian(W)
+Lt = scaled_laplacian(Wt)
+Ls = scaled_laplacian(Ws)
 # Alternative approximation method: 1st approx - first_approx(W, n).
-Lk = cheb_poly_approx(L, Ks, n)
-tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lk), tf.float32))
+Lkt = cheb_poly_approx(Lt, Ks, n)
+Lks = cheb_poly_approx(Ls, Ks, n)
+tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lkt), tf.float32))
+tf.add_to_collection(name='graph_kernel', value=tf.cast(tf.constant(Lks), tf.float32))
 
 # Data Preprocessing
 data_file = f'PeMSD7_V_{n}.csv'
-n_train, n_val, n_test = 34, 5, 5
 PeMS = data_gen(pjoin('./dataset', data_file), (n_train, n_val, n_test), n, n_his + n_pred)
 print(f'>> Loading dataset with Mean: {PeMS.mean:.2f}, STD: {PeMS.std:.2f}')
 
 if __name__ == '__main__':
-    model_train(PeMS, blocks, args)
-    model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode)
+    model_train(PeMS, blocks, args, pjoin(args.path, 'tensorboard'))
+    model_test(PeMS, PeMS.get_len('test')//2+1, n_his, n_pred, args.inf_mode, pjoin(args.path, 'models'))

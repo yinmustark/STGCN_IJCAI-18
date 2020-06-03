@@ -30,16 +30,6 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
     x = tf.placeholder(tf.float32, [None, n_his + 1, n, 1], name='data_input')
     keep_prob = tf.placeholder(tf.float32, name='keep_prob')
 
-    E1 = tf.get_variable('emb1', initializer=tf.random.uniform([n, args.channel]), dtype=tf.float32)
-    E2 = tf.get_variable('emb2', initializer=tf.random.uniform([args.channel, n]), dtype=tf.float32)
-    A = tf.nn.softmax(tf.nn.relu(tf.matmul(E1, E2)))
-    mat = A
-    adpt_kernels = [A]
-    for i in range(Ks-1):
-        mat = tf.matmul(A, mat)
-        adpt_kernels.append(mat)
-    adj = tf.concat(adpt_kernels, axis=-1)
-    tf.add_to_collection(name='graph_kernel', value=adj)
     # Define model loss
     train_loss, pred = build_model(x, n_his, Ks, Kt, blocks, keep_prob)
     tf.summary.scalar('train_loss', train_loss)
@@ -67,6 +57,8 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
 
     merged = tf.summary.merge_all()
 
+
+    #with tf.device(f'/gpu:{args.gpu}'):
     config = tf.get_collection('gpu_config')[0]
     with tf.Session(config=config) as sess:
         writer = tf.summary.FileWriter(pjoin(sum_path, 'train'), sess.graph)
@@ -93,7 +85,7 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
                 if j % 50 == 0:
                     loss_value = \
                         sess.run([train_loss, copy_loss],
-                                 feed_dict={x: x_batch[:, 0:n_his + 1, :, :], keep_prob: 1.0})
+                                    feed_dict={x: x_batch[:, 0:n_his + 1, :, :], keep_prob: 1.0})
                     print(f'Epoch {i:2d}, Step {j:3d}: [{loss_value[0]:.3f}, {loss_value[1]:.3f}]')
             print(f'Epoch {i:2d} Training Time {time.time() - start_time:.3f}s')
 
@@ -104,12 +96,12 @@ def model_train(inputs, blocks, args, sum_path='./output/tensorboard'):
             for ix in tmp_idx:
                 va, te = min_va_val[ix - 2:ix + 1], min_val[ix - 2:ix + 1]
                 print(f'Time Step {ix + 1}: '
-                      f'MAPE {va[0]:7.3%}, {te[0]:7.3%}; '
-                      f'MAE  {va[1]:4.3f}, {te[1]:4.3f}; '
-                      f'RMSE {va[2]:6.3f}, {te[2]:6.3f}.')
+                        f'MAPE {va[0]:7.3%}, {te[0]:7.3%}; '
+                        f'MAE  {va[1]:4.3f}, {te[1]:4.3f}; '
+                        f'RMSE {va[2]:6.3f}, {te[2]:6.3f}.')
             print(f'Epoch {i:2d} Inference Time {time.time() - start_time:.3f}s')
 
             if (i + 1) % args.save == 0:
-                model_save(sess, global_steps, 'STGCN')
+                model_save(sess, global_steps, 'STGCN', pjoin(args.path, 'models'))
         writer.close()
     print('Training model finished!')
