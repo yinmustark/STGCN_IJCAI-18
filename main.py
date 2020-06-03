@@ -42,6 +42,9 @@ parser.add_argument('-T', '--time_interval', type=int, default=12)
 parser.add_argument('-k', '--topk', type=int, default=5)
 parser.add_argument('-p', '--path', type=str, default='./output')
 parser.add_argument('-ow', '--overwrite', action='store_true')
+parser.add_argument('-gf', '--gpu_fraction', type=float, default=0.5)
+parser.add_argument('--gpu', type=int, default=0)
+
 
 args = parser.parse_args()
 print(f'Training configs: {args}')
@@ -50,6 +53,11 @@ n, n_his, n_pred = args.n_route, args.n_his, args.n_pred
 Ks, Kt = args.ks, args.kt
 # blocks: settings of channel size in st_conv_blocks / bottleneck design
 blocks = [[1, 32, 64], [64, 32, 128]]
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction = args.gpu_fraction
+tf.add_to_collection('gpu_config', value=config)
 
 # Load wighted adjacency matrix W
 # if args.graph == 'default':
