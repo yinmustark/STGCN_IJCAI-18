@@ -76,4 +76,4 @@ print(f'>> Loading dataset with Mean: {PeMS.mean:.2f}, STD: {PeMS.std:.2f}')
 
 if __name__ == '__main__':
     model_train(PeMS, blocks, args, pjoin(args.path, 'tensorboard'))
-    model_test(PeMS, PeMS.get_len('test'), n_his, n_pred, args.inf_mode, pjoin(args.path, 'models'))
+    model_test(PeMS, PeMS.get_len('test')//2+1, n_his, n_pred, args.inf_mode, pjoin(args.path, 'models'))
